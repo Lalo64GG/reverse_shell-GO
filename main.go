@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"os/exec"
 )
 
 func main() {
@@ -39,29 +39,15 @@ func main() {
         }
     }()
 
-	reader := bufio.NewReader(os.Stdin)
 
     // Mantener la conexión abierta
     for {
-        fmt.Println("Comando > ")
-		cmd, _ := reader.ReadString('\n')
-
-		_, err := c.Write([]byte(cmd))
-		if err != nil {
-			fmt.Println("Error al enviar el comando", err)
-			return 
-		}
-
-		response := make([]byte, 4096)
-
-		n, err := c.Read(response)
-		if err != nil {
-			fmt.Println("Error al recibir la respuesta", err)
-			return
-		}
-
-		fmt.Println("Respuesta:\n", string(response[:n]))
-
+		cmd := exec.Command("ls", "-la")
+        output, err := cmd.Output()
+        if err != nil {
+            fmt.Println(err)
+        }
+        fmt.Println(string(output))
 		
     }
 }
