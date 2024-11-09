@@ -9,7 +9,7 @@ import (
 
 func main() {
 	// Dirección IP y puerto donde el servidor escucha
-	serverAddress := "0.0.0.0:4444" // Asegúrate de que esté disponible
+	serverAddress := "192.168.0.14:4444" // Asegúrate de que esté disponible
 
 	// Escuchar en el puerto 4444
 	listener, err := net.Listen("tcp", serverAddress)
